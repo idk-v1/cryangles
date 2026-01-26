@@ -116,12 +116,14 @@ float noise(float x, float z)
 {
 	float perlin = Perlin_Get2d(x, z, 0.0001f, 5);
 	float pow = powf(perlin * 2.f - 1.f, 3.f) / 2.f + 0.5f;
-	//if (pow < 0.5f)
-	//{
-	//	pow -= (0.5f - pow);
-	//}
-	//pow = max(pow, 0.f);
-	return pow;
+	if (perlin <= 0.5f)
+	{
+		return lerp(pow, perlin, clampf(0.f, 0.75f, 1.f));
+	}
+	else
+	{
+		return pow;
+	}
 }
 
 
@@ -140,8 +142,8 @@ RGB colorFromHeight(float height)
 	const RGB stoneColor = {0.25f, 0.25f, 0.25f};
 	const RGB snowColor = {0.7f, 0.7f, 0.8f};
 
-	const float deepHeight = 0.4f;
-	const float waterHeight = 0.4999f;
+	const float deepHeight = 0.45f;
+	const float waterHeight = 0.499f;
 	const float sandHeight = 0.5f;
 	const float grassHeight = 0.501;
 	const float coldHeight = 0.52f;
@@ -199,8 +201,8 @@ Model generateWorld(float x, float z, int lod)
 	float zz = z * size * 2.f;
 
 	// I do not care how bad this is
-	for (float z = -size; z <= size + step; z += step)
-		for (float x = -size; x <= size + step; x += step)
+	for (float z = -size; z < size; z += step)
+		for (float x = -size; x < size; x += step)
 			model.count += 6;
 
 	Vertex* verts = malloc(sizeof(Vertex) * model.count);
@@ -213,31 +215,45 @@ Model generateWorld(float x, float z, int lod)
 	float scale = 0.01f;
 
 	size_t pos = 0;
-	for (float z = -size; z <= size + step; z += step)
-	{
-		float y00 = 0.f;
-		float y01 = 0.f;
-		float y10 = noise(xx - size - step, zz + z - step);
-		float y11 = noise(xx - size - step, zz + z);
-		for (float x = -size; x <= size + step; x += step)
+	for (float z = -size; z < size; z += step)
+	{		
+		float y00;
+		float y01;
+		float y10;
+		float y11;
+
+		float oldZ = z - step;
+		if (z + step >= size)
+			z = size;
+
+		y00 = 0.f;
+		y01 = 0.f;
+		y10 = noise(xx - size - step, zz + oldZ);
+		y11 = noise(xx - size - step, zz + z);
+
+		for (float x = -size; x < size; x += step)
 		{
+			float oldX = x - step;
+			if (x + step >= size)
+				x = size;
+
 			y00 = y10;
 			y01 = y11;
-			y10 = noise(xx + x, zz + z - step);
+			y10 = noise(xx + x, zz + oldZ);
 			y11 = noise(xx + x, zz + z);
 
-			verts[pos + 0].pos = vec3f(scale * (xx + x - step), noiseMod(y01), scale * (zz + z));
+			verts[pos + 0].pos = vec3f(scale * (xx + oldX), noiseMod(y01), scale * (zz + z));
 			verts[pos + 0].rgb = colorFromHeight(y01);
 			verts[pos + 1].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
 			verts[pos + 1].rgb = colorFromHeight(y11);
-			verts[pos + 2].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
+			verts[pos + 2].pos = vec3f(scale * (xx + oldX), noiseMod(y00), scale * (zz + oldZ));
 			verts[pos + 2].rgb = colorFromHeight(y00);
 
-			verts[pos + 3].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
+			verts[pos + 3].pos = vec3f(scale * (xx + oldX), noiseMod(y00), scale * (zz + oldZ));
 			verts[pos + 3].rgb = colorFromHeight(y00);
 			verts[pos + 4].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
 			verts[pos + 4].rgb = colorFromHeight(y11);
-			verts[pos + 5].pos = vec3f(scale * (xx + x), noiseMod(y10), scale * (zz + z - step));
+			verts[pos + 5].pos = vec3f(scale * (xx + x), noiseMod(y10), scale * (zz + oldZ));
 			verts[pos + 5].rgb = colorFromHeight(y10);
 
 			pos += 6;
