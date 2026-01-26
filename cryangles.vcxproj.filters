@@ -30,6 +30,9 @@
     <ClCompile Include="src\gl_helper.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\perlin.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="glad\include\glad\glad.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\vectorMath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\perlin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

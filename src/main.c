@@ -13,6 +13,8 @@
 
 #include "gl_helper.h"
 
+#include "perlin.h"
+
 void resize(GLFWwindow* window, int width, int height)
 {
 	glh_setView(width, height);
@@ -105,129 +107,91 @@ void setTitle(GLFWwindow* window, char* fmt, ...)
 	glfwSetWindowTitle(window, titleBuf);
 }
 
-float fract(float x)
+float noiseMod(float height)
 {
-	float i = floorf(x);
-	return x - i;
-}
-
-float random(float x, float z)
-{
-	return fract(sinf(x * 12.9898f + z * 78.233f) * 43758.5453123f);
-}
-
-float mix(float x, float y, float a)
-{
-	return x * (1.f - a) + y * a;
+	return height * 250.f;
 }
 
 float noise(float x, float z)
 {
-	float ix = floorf(x);
-	float iz = floorf(z);
-	float fx = fract(x);
-	float fz = fract(z);
-	
-	// Four corners in 2D of a tile
-	float a = random(ix, iz);
-	float b = random(ix + 1.f, iz);
-	float c = random(ix, iz + 1.f);
-	float d = random(ix + 1.f, iz + 1.f);
-
-	float ux = fx * fx * (3.f - 2.f * fx);
-	float uz = fz * fz * (3.f - 2.f * fz);
-
-	return mix(a, b, ux) +
-		(c - a) * uz * (1.f - ux) +
-		(d - b) * ux * uz;
+	float perlin = Perlin_Get2d(x, z, 0.0001f, 5);
+	float pow = powf(perlin * 2.f - 1.f, 3.f) / 2.f + 0.5f;
+	//if (pow < 0.5f)
+	//{
+	//	pow -= (0.5f - pow);
+	//}
+	//pow = max(pow, 0.f);
+	return pow;
 }
 
-float fbm(float x, float z)
-{
-	float scale = 0.0005f;
-	x *= scale;
-	z *= scale;
 
-	float dist = 0.f;
-	//dist = powf(fastSqrt(powf(x, 2.f) + powf(z, 2.f)) * 0.1f, 1.05f);
-
-	// Initial values
-	float value = 0;
-	float amplitude = 0.5f;
-	float frequency = 0.f;
-	int octaves = 6;
-	//
-	// Loop of octaves
-	for (int i = 0; i < octaves; i++)
-	{
-		value += amplitude * noise(x, z);
-		x *= 2.f;
-		z *= 2.f;
-		amplitude *= 0.5f;
-	}
-
-	return max(value - dist, 0.f);
-}
-
-float noiseMod(float height)
-{
-	if (height > 0.7f)
-		height = 0.6f + log10f(1.f + (height - 0.6f) * 0.75f) * 10.f + (height - 0.7f) * 1.5f;
-	else if (height > 0.6f)
-		height = 0.6f + log10f(1.f + (height - 0.6f) * 0.75f) * 10.f;
-	else if (height < 0.25f)
-		height = 0.25f - powf(0.25f - height, 0.9f);
-
-	return height * 10.f;
-}
-
+// 0.2 is min ocean
+// 0.4 is avg min ocean
+// 0.5 is max ocean
 RGB colorFromHeight(float height)
 {
-	RGB rgb = { 0 };
-	if (height >= 0.75f)
+	RGB color = { 0 };
+
+	const RGB deepColor = {0.f, 0.f, 0.05f};
+	const RGB waterColor = {0.f, 0.f, 0.25f};
+	const RGB sandColor = {0.5f, 0.5f, 0.35f};
+	const RGB grassColor = {0.35f, 0.5f, 0.15f};
+	const RGB coldColor = {0.f, 0.25f, 0.15f};
+	const RGB stoneColor = {0.25f, 0.25f, 0.25f};
+	const RGB snowColor = {0.7f, 0.7f, 0.8f};
+
+	const float deepHeight = 0.4f;
+	const float waterHeight = 0.4999f;
+	const float sandHeight = 0.5f;
+	const float grassHeight = 0.501;
+	const float coldHeight = 0.52f;
+	const float stoneHeight = 0.58f;
+	const float snowHeight = 0.64f;
+
+	if (height <= waterHeight)
 	{
-		rgb.r = (height - 0.65f) * 2.f + 0.15f;
-		rgb.g = (height - 0.65f) * 2.f + 0.15f;
-		rgb.b = (height - 0.65f) * 2.f + 0.15f;
+		float value = (height - deepHeight) / (waterHeight - deepHeight);
+		color = lerpRGB(waterColor, deepColor, value);
 	}
-	else if (height >= 0.65f)
+	else if (height <= sandHeight)
 	{
-		rgb.r = (height - 0.65f + 0.2f);
-		rgb.g = (height - 0.65f + 0.2f);
-		rgb.b = (height - 0.65f + 0.2f);
+		float value = (height - waterHeight) / (sandHeight - waterHeight);
+		color = lerpRGB(sandColor, waterColor, value);
 	}
-	else if (height >= 0.5f)
+	else if (height <= grassHeight)
 	{
-		rgb.r = (height - 0.5f) * 1.333f;
-		rgb.g = (height - 0.5f) * -2.65f + 0.6f;
-		rgb.b = (height - 0.5f) * 1.333f;
+		float value = (height - sandHeight) / (grassHeight - sandHeight);
+		color = lerpRGB(grassColor, sandColor, value);
 	}
-	else if (height >= 0.35f)
+	else if (height <= coldHeight)
 	{
-		rgb.r = 0.f;
-		rgb.g = 1.f - ((height - 0.35f) * 2.f);
-		rgb.b = 0.f;
+		float value = (height - grassHeight) / (coldHeight - grassHeight);
+		color = lerpRGB(coldColor, grassColor, value);
 	}
-	else if (height >= 0.3f)
+	else if (height <= stoneHeight)
 	{
-		rgb.r = 1.f - ((height - 0.3f) * 2.f);
-		rgb.g = 1.f - ((height - 0.3f) * 2.f);
-		rgb.b = 0.25f;
+		float value = (height - coldHeight) / (stoneHeight - coldHeight);
+		color = lerpRGB(stoneColor, coldColor, value);
 	}
-	else if (height <= 0.3f)
+	else if (height <= snowHeight)
 	{
-		rgb.r = 0.f;
-		rgb.g = 0.f;
-		rgb.b = height * 2.f;
+		float value = (height - stoneHeight) / (snowHeight - stoneHeight);
+		color = lerpRGB(snowColor, stoneColor, value);
+	}
+	else
+	{
+		color = snowColor;
 	}
 
-	return rgb;
+	return color;
 }
 
 Model generateWorld(float x, float z, int lod)
 {
 	Model model = { 0 };
 
+	if (lod > 8)
+		lod = 8;
 	float step = 5.f * powf(1.75f, lod);
 	float size = 1000.f;
 
@@ -250,20 +214,29 @@ Model generateWorld(float x, float z, int lod)
 
 	size_t pos = 0;
 	for (float z = -size; z <= size + step; z += step)
+	{
+		float y00 = 0.f;
+		float y01 = 0.f;
+		float y10 = noise(xx - size, zz + z - step);
+		float y11 = noise(xx - size, zz + z);
 		for (float x = -size; x <= size + step; x += step)
 		{
-			float y00 = fbm(xx + x - step, zz + z - step);
-			float y01 = fbm(xx + x - step, zz + z       );
-			float y10 = fbm(xx + x       , zz + z - step);
-			float y11 = fbm(xx + x       , zz + z       );
+			//float y00 = noise(xx + x - step, zz + z - step);
+			//float y01 = noise(xx + x - step, zz + z);
+			//float y10 = noise(xx + x, zz + z - step);
+			//float y11 = noise(xx + x, zz + z);
+			y00 = y10;
+			y01 = y11;
+			y10 = noise(xx + x, zz + z - step);
+			y11 = noise(xx + x, zz + z);
 
-			verts[pos + 0].pos = vec3f(scale * (xx + x - step), noiseMod(y01), scale * (zz + z       ));
-			verts[pos + 1].pos = vec3f(scale * (xx + x       ), noiseMod(y11), scale * (zz + z       ));
+			verts[pos + 0].pos = vec3f(scale * (xx + x - step), noiseMod(y01), scale * (zz + z));
+			verts[pos + 1].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
 			verts[pos + 2].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
 
 			verts[pos + 3].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
-			verts[pos + 4].pos = vec3f(scale * (xx + x       ), noiseMod(y11), scale * (zz + z       ));
-			verts[pos + 5].pos = vec3f(scale * (xx + x       ), noiseMod(y10), scale * (zz + z - step));
+			verts[pos + 4].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
+			verts[pos + 5].pos = vec3f(scale * (xx + x), noiseMod(y10), scale * (zz + z - step));
 
 			verts[pos + 0].rgb = colorFromHeight(y01);
 			verts[pos + 1].rgb = colorFromHeight(y11);
@@ -275,6 +248,7 @@ Model generateWorld(float x, float z, int lod)
 
 			pos += 6;
 		}
+	}
 
 	model = glh_loadModel(verts, model.count);
 	free(verts);
@@ -319,7 +293,7 @@ int main()
 	
 	GLuint shader = glh_loadShader("src/shader.vert", "src/shader.frag");
 
-	int worldSize = 21;
+	int worldSize = 125;
 	Model* world = malloc(sizeof(Model) * worldSize * worldSize);
 	for (int x = 0; x < worldSize; x++)
 		for (int z = 0; z < worldSize; z++)
@@ -354,7 +328,7 @@ int main()
 			camera.vel.y *= 0.9f;
 			camera.vel.z *= 0.9f;
 
-			float ground = noiseMod(fbm(camera.trans.pos.x * 100.f, camera.trans.pos.z * 100.f));
+			float ground = noiseMod(noise(camera.trans.pos.x * 100.f, camera.trans.pos.z * 100.f));
 
 			if (camera.trans.pos.y < ground)
 			{
@@ -375,8 +349,8 @@ int main()
 
 		glfwSwapBuffers(window);
 
-		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f)", fps,
-			triCount / 3,
+		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f)", 
+			fps, triCount / 3,
 			camera.trans.pos.x, camera.trans.pos.y, camera.trans.pos.z);
 
 		double timeFPSNow = glfwGetTime();
@@ -396,6 +370,7 @@ int main()
 	for (int x = 0; x < worldSize; x++)
 		for (int z = 0; z < worldSize; z++)
 			glh_deleteModel(world[x + z * worldSize]);
+	free(world);
 
 	glDeleteProgram(shader);
 	glfwDestroyWindow(window);

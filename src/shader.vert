@@ -13,9 +13,9 @@ void main()
 {
 	gl_Position = projMat * viewMat * vec4(inPos - camPos, 1.0);
 
-	if (camPos.y < 3.0)
+	if (camPos.y < 125.0)
 	{
-		float depthEffect = (1.0 - (camPos.y / 3.0)) * 0.8 + 0.2;
+		float depthEffect = (1.0 - (camPos.y / 125.0)) * 0.8 + 0.2;
 		vec3 waterColor = vec3(0.0, 0.0, 0.4);
 	    outColor = vec4((inColor * (1.0 - depthEffect) + waterColor * depthEffect) * 0.5, 1.0);
 	}

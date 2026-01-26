@@ -103,3 +103,38 @@ static float gls_wrapDeg(float deg)
 		deg += 360.f;
 	return deg;
 }
+
+
+static float clampf(float min, float value, float max)
+{
+	return fmaxf(fminf(value, max), min);
+}
+
+static float lerp(float x, float y, float mix)
+{
+	//mix = clampf(0.f, mix, 1.f);
+	return x * mix + y * (1.f - mix);
+}
+
+typedef struct RGB
+{
+	float r, g, b;
+} RGB;
+
+static RGB lerpRGB(RGB a, RGB b, float mix)
+{
+	RGB color;
+	color.r = lerp(a.r, b.r, mix);
+	color.g = lerp(a.g, b.g, mix);
+	color.b = lerp(a.b, b.b, mix);
+	return color;
+}
+
+static RGB rgb(float r, float g, float b)
+{
+	RGB color;
+	color.r = r; // clampf(0.f, r, 1.f);
+	color.g = g; // clampf(0.f, g, 1.f);
+	color.b = b; // clampf(0.f, b, 1.f);
+	return color;
+}

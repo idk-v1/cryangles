@@ -15,11 +15,6 @@ extern unsigned glh_height;
 void glh_setView(unsigned width, unsigned height);
 
 
-typedef struct RGB
-{
-	float r, g, b;
-} RGB;
-
 typedef struct Vertex
 {
 	Vec3f pos;
