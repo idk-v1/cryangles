@@ -217,33 +217,27 @@ Model generateWorld(float x, float z, int lod)
 	{
 		float y00 = 0.f;
 		float y01 = 0.f;
-		float y10 = noise(xx - size, zz + z - step);
-		float y11 = noise(xx - size, zz + z);
+		float y10 = noise(xx - size - step, zz + z - step);
+		float y11 = noise(xx - size - step, zz + z);
 		for (float x = -size; x <= size + step; x += step)
 		{
-			//float y00 = noise(xx + x - step, zz + z - step);
-			//float y01 = noise(xx + x - step, zz + z);
-			//float y10 = noise(xx + x, zz + z - step);
-			//float y11 = noise(xx + x, zz + z);
 			y00 = y10;
 			y01 = y11;
 			y10 = noise(xx + x, zz + z - step);
 			y11 = noise(xx + x, zz + z);
 
 			verts[pos + 0].pos = vec3f(scale * (xx + x - step), noiseMod(y01), scale * (zz + z));
-			verts[pos + 1].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
-			verts[pos + 2].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
-
-			verts[pos + 3].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
-			verts[pos + 4].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
-			verts[pos + 5].pos = vec3f(scale * (xx + x), noiseMod(y10), scale * (zz + z - step));
-
 			verts[pos + 0].rgb = colorFromHeight(y01);
+			verts[pos + 1].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
 			verts[pos + 1].rgb = colorFromHeight(y11);
+			verts[pos + 2].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
 			verts[pos + 2].rgb = colorFromHeight(y00);
 
+			verts[pos + 3].pos = vec3f(scale * (xx + x - step), noiseMod(y00), scale * (zz + z - step));
 			verts[pos + 3].rgb = colorFromHeight(y00);
+			verts[pos + 4].pos = vec3f(scale * (xx + x), noiseMod(y11), scale * (zz + z));
 			verts[pos + 4].rgb = colorFromHeight(y11);
+			verts[pos + 5].pos = vec3f(scale * (xx + x), noiseMod(y10), scale * (zz + z - step));
 			verts[pos + 5].rgb = colorFromHeight(y10);
 
 			pos += 6;
