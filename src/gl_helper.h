@@ -63,4 +63,4 @@ void glh_setUniformVec3(GLuint shader, const char* name, Vec3f value);
 void glh_setUniformFloat(GLuint shader, const char* name, float value);
 void glh_setUniformMat4(GLuint shader, const char* name, Matrix4* value);
 
-void glh_updateCamera(GLuint shader, Object* camera);
+void glh_updateCamera(GLuint shader, Object* camera, float fov, float viewDist);

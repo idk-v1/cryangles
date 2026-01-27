@@ -8,17 +8,30 @@ out vec4 outColor;
 uniform mat4 projMat;
 uniform mat4 viewMat;
 uniform vec3 camPos;
+uniform float viewDist;
 
 void main()
 {
 	gl_Position = projMat * viewMat * vec4(inPos - camPos, 1.0);
 
-	if (camPos.y < 125.0)
+	float camDist = length(inPos.xz - camPos.xz);
+
+	vec3 color = inColor;
+
+	float seaLevel = 125.0;
+	if (camPos.y < seaLevel)
 	{
-		float depthEffect = (1.0 - (camPos.y / 125.0)) * 0.8 + 0.2;
+		float depthEffect = clamp((1.0 - (camPos.y / seaLevel)) * 0.8 + 0.2, 0.0, 1.0);
 		vec3 waterColor = vec3(0.0, 0.0, 0.4);
-	    outColor = vec4((inColor * (1.0 - depthEffect) + waterColor * depthEffect) * 0.5, 1.0);
+		color.r = mix(waterColor.r, inColor.r, depthEffect);
+		color.g = mix(waterColor.g, inColor.g, depthEffect);
+		color.b = mix(waterColor.b, inColor.b, depthEffect);
 	}
-	else 
-		outColor = vec4(inColor, 1.0);
+
+	float a = 1.0;
+	float viewDistMod = viewDist - 100.0;
+	if (camDist > viewDistMod)
+		a = 1.0 - clamp((camDist - viewDistMod) * 0.01, 0.0, 1.0);
+
+	outColor = vec4(color, a);
 }

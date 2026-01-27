@@ -62,9 +62,14 @@ static Vec3f vec3f(float x, float y, float z)
 	return vec;
 }
 
+static float pow2f(float x)
+{
+	return x * x;
+}
+
 static Vec3f normalize(Vec3f vec)
 {
-	float dist = fastSqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+	float dist = fastSqrt(pow2f(vec.x) + pow2f(vec.y) + pow2f(vec.z));
 	vec.x /= dist;
 	vec.y /= dist;
 	vec.z /= dist;

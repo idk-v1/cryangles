@@ -21,7 +21,28 @@ void resize(GLFWwindow* window, int width, int height)
 }
 
 
-void playerInput(GLFWwindow* window, Object* camera, float moveSpeed, float lookSpeed, bool* paused)
+float noiseMod(float height)
+{
+	return height * 250.f;
+}
+
+float noise(float x, float z)
+{
+	float perlin = Perlin_Get2d(x, z, 0.0001f, 5);
+	float pow = powf(perlin * 2.f - 1.f, 3.f) / 2.f + 0.5f;
+	if (perlin <= 0.5f)
+	{
+		return lerp(pow, perlin, clampf(0.f, 0.75f, 1.f));
+	}
+	else
+	{
+		return pow;
+	}
+}
+
+
+void playerInput(GLFWwindow* window, Object* camera, float moveSpeed, 
+	float sprintSpeed, float lookSpeed, float jumpHeight, float gravity, bool* paused)
 {
 	static bool escLast = false;
 	bool escape = glfwGetKey(window, GLFW_KEY_ESCAPE);
@@ -41,58 +62,86 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed, float look
 	}
 	escLast = escape;
 
-	camera->vel.y -= moveSpeed * 2.f;
+	static bool lastOnGround = false;
+	float ground = noiseMod(noise(camera->trans.pos.x * 100.f, camera->trans.pos.z * 100.f));
+	bool onGround = (camera->trans.pos.y == ground);
 
-	if (*paused)
-		return;
+	if (!*paused)
+	{
+		float forward = 0.f;
+		float side = 0.f;
+		float up = 0.f;
 
-	float forward = 0.f;
-	float side = 0.f;
-	float up = 0.f;
+		bool sprint = false;
 
-	if (glfwGetKey(window, GLFW_KEY_W))
-		--forward;
-	if (glfwGetKey(window, GLFW_KEY_S))
-		++forward;
-	if (glfwGetKey(window, GLFW_KEY_A))
-		--side;
-	if (glfwGetKey(window, GLFW_KEY_D))
-		++side;
-	if (glfwGetKey(window, GLFW_KEY_SPACE))
-		++up;
-	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))
-		--up;
+		if (glfwGetKey(window, GLFW_KEY_W))
+		{
+			--forward;
+			sprint = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_S))
+			++forward;
+		if (glfwGetKey(window, GLFW_KEY_A))
+			--side;
+		if (glfwGetKey(window, GLFW_KEY_D))
+			++side;
+		if (glfwGetKey(window, GLFW_KEY_SPACE))
+		{
+			if (onGround || lastOnGround || glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
+				++up;
+		}
+		sprint = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) && sprint);
 
-	float moveDist = fastSqrt(forward * forward + side * side);
-	float moveAngle = fastAtan2(side, forward);
-	forward = cosf(moveAngle) * moveDist;
-	side = sinf(moveAngle) * moveDist;
+		float moveDist = fastSqrt(forward * forward + side * side);
+		float moveAngle = fastAtan2(side, forward);
+		forward = cosf(moveAngle) * moveDist;
+		side = sinf(moveAngle) * moveDist;
 
-	camera->vel.z += (
-		cosf(toRad(camera->trans.rot.y)) * forward - 
-		sinf(toRad(camera->trans.rot.y)) * side
-		) * moveSpeed;
+		camera->vel.z += (
+			cosf(toRad(camera->trans.rot.y)) * forward -
+			sinf(toRad(camera->trans.rot.y)) * side
+			) * (sprint ? sprintSpeed : moveSpeed);
 
-	camera->vel.x += (
-		sinf(toRad(camera->trans.rot.y)) * forward +
-		cosf(toRad(camera->trans.rot.y)) * side
-		) * moveSpeed;
+		camera->vel.x += (
+			sinf(toRad(camera->trans.rot.y)) * forward +
+			cosf(toRad(camera->trans.rot.y)) * side
+			) * (sprint ? sprintSpeed : moveSpeed);
 
-	camera->vel.y += up * moveSpeed * 3.f;
+		camera->vel.y += up * jumpHeight;
 
 
-	double mouseX, mouseY;
-	glfwGetCursorPos(window, &mouseX, &mouseY);
-	camera->trans.rot.y -= (float)(mouseX - glh_width / 2.f) * lookSpeed;
-	camera->trans.rot.x += (float)(glh_height / 2.f - mouseY) * lookSpeed;
-	glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
+		double mouseX, mouseY;
+		glfwGetCursorPos(window, &mouseX, &mouseY);
+		camera->trans.rot.y -= (float)(mouseX - glh_width / 2.f) * lookSpeed;
+		camera->trans.rot.x += (float)(glh_height / 2.f - mouseY) * lookSpeed;
+		glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
 
-	if (camera->trans.rot.x > 90.f)
-		camera->trans.rot.x = 90.f;
-	if (camera->trans.rot.x < -90.f)
-		camera->trans.rot.x = -90.f;
-	camera->trans.rot.y = gls_wrapDeg(camera->trans.rot.y);
-	camera->trans.rot.z = gls_wrapDeg(camera->trans.rot.z);
+		if (camera->trans.rot.x > 90.f)
+			camera->trans.rot.x = 90.f;
+		if (camera->trans.rot.x < -90.f)
+			camera->trans.rot.x = -90.f;
+		camera->trans.rot.y = gls_wrapDeg(camera->trans.rot.y);
+		camera->trans.rot.z = gls_wrapDeg(camera->trans.rot.z);
+	}
+
+	camera->vel.y += gravity;
+
+	camera->trans.pos.x += camera->vel.x;
+	camera->trans.pos.y += camera->vel.y;
+	camera->trans.pos.z += camera->vel.z;
+
+	camera->vel.x *= onGround ? 0.9f : 0.95f;
+	camera->vel.y *= 0.95f;
+	camera->vel.z *= onGround ? 0.9f : 0.95f;
+
+	ground = noiseMod(noise(camera->trans.pos.x * 100.f, camera->trans.pos.z * 100.f));
+	if (camera->trans.pos.y < ground)
+	{
+		camera->vel.y = 0.f;
+		camera->trans.pos.y = ground;
+	}
+
+	lastOnGround = onGround;
 }
 
 void setTitle(GLFWwindow* window, char* fmt, ...)
@@ -105,25 +154,6 @@ void setTitle(GLFWwindow* window, char* fmt, ...)
 	va_end(args);
 
 	glfwSetWindowTitle(window, titleBuf);
-}
-
-float noiseMod(float height)
-{
-	return height * 250.f;
-}
-
-float noise(float x, float z)
-{
-	float perlin = Perlin_Get2d(x, z, 0.0001f, 5);
-	float pow = powf(perlin * 2.f - 1.f, 3.f) / 2.f + 0.5f;
-	if (perlin <= 0.5f)
-	{
-		return lerp(pow, perlin, clampf(0.f, 0.75f, 1.f));
-	}
-	else
-	{
-		return pow;
-	}
 }
 
 
@@ -192,13 +222,15 @@ Model generateWorld(float x, float z, int lod)
 {
 	Model model = { 0 };
 
-	if (lod > 8)
-		lod = 8;
+	lod = min(lod, 8);
+
 	float step = 5.f * powf(1.75f, lod);
 	float size = 1000.f;
 
 	float xx = x * size * 2.f;
 	float zz = z * size * 2.f;
+	float scale = 0.01f;
+	//printf("Gen Chunk (%f, %f)\n", scale * xx, scale * zz);
 
 	// I do not care how bad this is
 	for (float z = -size; z < size; z += step)
@@ -211,8 +243,6 @@ Model generateWorld(float x, float z, int lod)
 		model.count = 0;
 		return model;
 	}
-
-	float scale = 0.01f;
 
 	size_t pos = 0;
 	for (float z = -size; z < size; z += step)
@@ -287,6 +317,8 @@ int main()
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ZERO);
 
 	//glEnable(GL_POLYGON_OFFSET_LINE);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -303,10 +335,12 @@ int main()
 	
 	GLuint shader = glh_loadShader("src/shader.vert", "src/shader.frag");
 
+	float viewDist = 750.f;
+
 	int worldSize = 125;
 	Model* world = malloc(sizeof(Model) * worldSize * worldSize);
-	for (int x = 0; x < worldSize; x++)
-		for (int z = 0; z < worldSize; z++)
+	for (int z = 0; z < worldSize; z++)
+		for (int x = 0; x < worldSize; x++)
 		{
 			int lod = max(abs(x - worldSize / 2), abs(z - worldSize / 2));
 			world[x + z * worldSize] = generateWorld(x - worldSize / 2, z - worldSize / 2, lod);
@@ -314,7 +348,11 @@ int main()
 
 	Object camera = { 0 };
 	float moveSpeed = 0.0075f;
+	float sprintSpeed = 0.02f;
+	float jumpHeight = 0.3f;
+	float gravity = -0.03f;
 	float lookSpeed = 0.1f;
+	float fov = 120.f;
 
 	bool paused = false;
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -328,40 +366,55 @@ int main()
 		{
 			deltaTime -= updateTime;
 
-			playerInput(window, &camera, moveSpeed, lookSpeed, &paused);
+			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, gravity, &paused);
 
-			camera.trans.pos.x += camera.vel.x;
-			camera.trans.pos.y += camera.vel.y;
-			camera.trans.pos.z += camera.vel.z;
-
-			camera.vel.x *= 0.9f;
-			camera.vel.y *= 0.9f;
-			camera.vel.z *= 0.9f;
-
-			float ground = noiseMod(noise(camera.trans.pos.x * 100.f, camera.trans.pos.z * 100.f));
-
-			if (camera.trans.pos.y < ground)
-			{
-				camera.vel.y = 0.f;
-				camera.trans.pos.y = ground;
-			}
+			if (glfwGetKey(window, GLFW_KEY_DOWN))
+				viewDist -= 5.f;
+			if (glfwGetKey(window, GLFW_KEY_UP))
+				viewDist += 5.f;
 		}
 		timeLast = timeNow;
-		glh_updateCamera(shader, &camera);
+		glh_updateCamera(shader, &camera, fov, viewDist);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUseProgram(shader);
 
-		for (int x = 0; x < worldSize; x++)
-			for (int z = 0; z < worldSize; z++)
-				gls_drawModel(world[x + z * worldSize]);
+		size_t triCount = 0;
+		for (int z = 0; z < worldSize; z++)
+			for (int x = 0; x < worldSize; x++)
+			{
+				float cX = (x - worldSize / 2) * 20.f;
+				float cZ = (z - worldSize / 2) * 20.f;
+
+				float pX = camera.trans.pos.x;
+				float pZ = camera.trans.pos.z;
+
+				float dist = pow2f(cX - pX) + pow2f(cZ - pZ);
+				if (dist > pow2f(viewDist))
+					continue;
+				
+				pX += sinf(toRad(camera.trans.rot.y)) * 20.f;
+				pZ += cosf(toRad(camera.trans.rot.y)) * 20.f;
+				
+				float angleDiff = fmodf(camera.trans.rot.y - 
+					toDeg(fastAtan2(pX - cX, pZ - cZ)) + 
+					180.f + 360.f, 360.f) - 180.f;
+				
+				if (angleDiff <= fov * 0.667f && angleDiff >= -fov * 0.667f)
+				{
+					gls_drawModel(world[x + z * worldSize]);
+					triCount += world[x + z * worldSize].count;
+				}
+			}
 
 		glfwSwapBuffers(window);
 
-		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f)", 
+		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f) | Rot(%.2f, %.2f) | ViewDist: %f", 
 			fps, triCount / 3,
-			camera.trans.pos.x, camera.trans.pos.y, camera.trans.pos.z);
+			camera.trans.pos.x, camera.trans.pos.y, camera.trans.pos.z,
+			camera.trans.rot.x, camera.trans.rot.y,
+			viewDist);
 
 		double timeFPSNow = glfwGetTime();
 		deltaFPS += timeFPSNow - timeFPSLast;
@@ -377,8 +430,8 @@ int main()
 		glfwPollEvents();
 	}
 
-	for (int x = 0; x < worldSize; x++)
-		for (int z = 0; z < worldSize; z++)
+	for (int z = 0; z < worldSize; z++)
+		for (int x = 0; x < worldSize; x++)
 			glh_deleteModel(world[x + z * worldSize]);
 	free(world);
 

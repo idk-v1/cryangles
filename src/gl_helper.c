@@ -10,8 +10,6 @@ void glh_setView(unsigned width, unsigned height)
 	glViewport(0, 0, width, height);
 }
 
-size_t triCount = 0;
-
 
 Model glh_loadModel(Vertex* verts, size_t count)
 {
@@ -30,8 +28,6 @@ Model glh_loadModel(Vertex* verts, size_t count)
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(Vec3f));
 	glEnableVertexAttribArray(1);
 
-	triCount += count;
-
 	return model;
 }
 
@@ -39,8 +35,6 @@ void glh_deleteModel(Model model)
 {
 	glDeleteVertexArrays(1, &model.vao);
 	glDeleteBuffers(1, &model.vbo);
-
-	triCount -= model.count;
 }
 
 void gls_drawModel(Model model)
@@ -155,12 +149,11 @@ void glh_setUniformMat4(GLuint shader, const char* name, Matrix4* value)
 }
 
 
-void glh_updateCamera(GLuint shader, Object* camera)
+void glh_updateCamera(GLuint shader, Object* camera, float fov, float viewDist)
 {
 	Matrix4 projMat = { 0 };
 	Matrix4 viewMat = { 0 };
 
-	float fov = 120.f;
 	float aspect = (float)glh_width / (float)glh_height;
 
 	float far = 10000.f;
@@ -191,12 +184,10 @@ void glh_updateCamera(GLuint shader, Object* camera)
 	viewMat.m[2 + 0 * 4] = -lookat.x;
 	viewMat.m[2 + 1 * 4] = -lookat.y;
 	viewMat.m[2 + 2 * 4] = -lookat.z;
-	//viewMat.m[0 + 3 * 4] = dot(s, eye);
-	//viewMat.m[1 + 3 * 4] = dot(u, eye);
-	//viewMat.m[2 + 3 * 4] = -dot(lookat, eye);
 	viewMat.m[3 + 3 * 4] = 1.f;
 
 	glh_setUniformMat4(shader, "projMat", &projMat);
 	glh_setUniformMat4(shader, "viewMat", &viewMat);
 	glh_setUniformVec3(shader, "camPos", eye);
+	glh_setUniformFloat(shader, "viewDist", viewDist);
 }
