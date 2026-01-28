@@ -41,8 +41,32 @@ float noise(float x, float z)
 }
 
 
+void applyPhysics(Object* object, float gravity)
+{
+	float ground = noiseMod(noise(object->trans.pos.x * 100.f, object->trans.pos.z * 100.f));
+	bool onGround = (object->trans.pos.y == ground);
+
+	object->vel.y += gravity;
+
+	object->trans.pos.x += object->vel.x;
+	object->trans.pos.y += object->vel.y;
+	object->trans.pos.z += object->vel.z;
+
+	object->vel.x *= onGround ? 0.9f : 0.95f;
+	object->vel.y *= 0.95f;
+	object->vel.z *= onGround ? 0.9f : 0.95f;
+
+	ground = noiseMod(noise(object->trans.pos.x * 100.f, object->trans.pos.z * 100.f));
+	if (object->trans.pos.y < ground)
+	{
+		object->vel.y = 0.f;
+		object->trans.pos.y = ground;
+	}
+}
+
+
 void playerInput(GLFWwindow* window, Object* camera, float moveSpeed, 
-	float sprintSpeed, float lookSpeed, float jumpHeight, float gravity, bool* paused)
+	float sprintSpeed, float lookSpeed, float jumpHeight, bool* paused)
 {
 	static bool escLast = false;
 	bool escape = glfwGetKey(window, GLFW_KEY_ESCAPE);
@@ -72,25 +96,26 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed,
 		float side = 0.f;
 		float up = 0.f;
 
-		bool sprint = false;
+		bool sprint = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT);
 
 		if (glfwGetKey(window, GLFW_KEY_W))
 		{
-			--forward;
-			sprint = true;
+			if (sprint)
+				forward -= sprintSpeed;
+			else
+				forward -= moveSpeed;
 		}
 		if (glfwGetKey(window, GLFW_KEY_S))
-			++forward;
+			forward += moveSpeed;
 		if (glfwGetKey(window, GLFW_KEY_A))
-			--side;
+			side -= moveSpeed;
 		if (glfwGetKey(window, GLFW_KEY_D))
-			++side;
+			side += moveSpeed;
 		if (glfwGetKey(window, GLFW_KEY_SPACE))
 		{
 			if (onGround || lastOnGround || glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
-				++up;
+				up += jumpHeight;
 		}
-		sprint = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) && sprint);
 
 		float moveDist = fastSqrt(forward * forward + side * side);
 		float moveAngle = fastAtan2(side, forward);
@@ -99,15 +124,13 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed,
 
 		camera->vel.z += (
 			cosf(toRad(camera->trans.rot.y)) * forward -
-			sinf(toRad(camera->trans.rot.y)) * side
-			) * (sprint ? sprintSpeed : moveSpeed);
+			sinf(toRad(camera->trans.rot.y)) * side);
 
 		camera->vel.x += (
 			sinf(toRad(camera->trans.rot.y)) * forward +
-			cosf(toRad(camera->trans.rot.y)) * side
-			) * (sprint ? sprintSpeed : moveSpeed);
+			cosf(toRad(camera->trans.rot.y)) * side);
 
-		camera->vel.y += up * jumpHeight;
+		camera->vel.y += up;
 
 
 		double mouseX, mouseY;
@@ -122,23 +145,6 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed,
 			camera->trans.rot.x = -90.f;
 		camera->trans.rot.y = gls_wrapDeg(camera->trans.rot.y);
 		camera->trans.rot.z = gls_wrapDeg(camera->trans.rot.z);
-	}
-
-	camera->vel.y += gravity;
-
-	camera->trans.pos.x += camera->vel.x;
-	camera->trans.pos.y += camera->vel.y;
-	camera->trans.pos.z += camera->vel.z;
-
-	camera->vel.x *= onGround ? 0.9f : 0.95f;
-	camera->vel.y *= 0.95f;
-	camera->vel.z *= onGround ? 0.9f : 0.95f;
-
-	ground = noiseMod(noise(camera->trans.pos.x * 100.f, camera->trans.pos.z * 100.f));
-	if (camera->trans.pos.y < ground)
-	{
-		camera->vel.y = 0.f;
-		camera->trans.pos.y = ground;
 	}
 
 	lastOnGround = onGround;
@@ -366,7 +372,8 @@ int main()
 		{
 			deltaTime -= updateTime;
 
-			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, gravity, &paused);
+			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, &paused);
+			applyPhysics(&camera, gravity);
 
 			if (glfwGetKey(window, GLFW_KEY_DOWN))
 				viewDist -= 5.f;
