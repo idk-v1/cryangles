@@ -330,9 +330,9 @@ int main()
 	
 	GLuint shader = glh_loadShader("src/shader.vert", "src/shader.frag");
 
-	float viewDist = 750.f;
+	float viewDist = 250.f;
 
-	int worldSize = 125;
+	int worldSize = viewDist / 10.f;
 	Model* world = malloc(sizeof(Model) * worldSize * worldSize);
 	for (int z = 0; z < worldSize; z++)
 		for (int x = 0; x < worldSize; x++)
@@ -395,11 +395,6 @@ int main()
 
 			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, paused);
 			applyPhysics(&camera, gravity);
-
-			if (glfwGetKey(window, GLFW_KEY_DOWN))
-				viewDist -= 5.f;
-			if (glfwGetKey(window, GLFW_KEY_UP))
-				viewDist += 5.f;
 		}
 		timeLast = timeNow;
 		glh_updateCamera(shader, &camera, fov, viewDist);
