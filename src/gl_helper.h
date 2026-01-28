@@ -31,6 +31,8 @@ typedef struct Object
 {
 	Transform trans;
 	Vec3f vel;
+	bool onGround;
+	bool inWater;
 } Object;
 
 typedef struct Model

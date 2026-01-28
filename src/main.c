@@ -31,13 +31,9 @@ float noise(float x, float z)
 	float perlin = Perlin_Get2d(x, z, 0.0001f, 5);
 	float pow = powf(perlin * 2.f - 1.f, 3.f) / 2.f + 0.5f;
 	if (perlin <= 0.5f)
-	{
-		return lerp(pow, perlin, clampf(0.f, 0.75f, 1.f));
-	}
+		return lerp(pow, perlin, 0.75f);
 	else
-	{
 		return pow;
-	}
 }
 
 
@@ -56,41 +52,35 @@ void applyPhysics(Object* object, float gravity)
 	object->vel.y *= 0.95f;
 	object->vel.z *= onGround ? 0.9f : 0.95f;
 
+	if (object->inWater)
+	{
+		object->vel.x *= 0.8f;
+		object->vel.y *= 0.5f;
+		object->vel.z *= 0.8f;
+	}
+
 	ground = noiseMod(noise(object->trans.pos.x * 100.f, object->trans.pos.z * 100.f));
 	if (object->trans.pos.y < ground)
 	{
 		object->vel.y = 0.f;
 		object->trans.pos.y = ground;
 	}
+
+	object->inWater = false;
+	if (object->trans.pos.y < 124.75f)
+	{
+		object->inWater = true;
+	}
 }
 
 
 void playerInput(GLFWwindow* window, Object* camera, float moveSpeed, 
-	float sprintSpeed, float lookSpeed, float jumpHeight, bool* paused)
+	float sprintSpeed, float lookSpeed, float jumpHeight, bool paused)
 {
-	static bool escLast = false;
-	bool escape = glfwGetKey(window, GLFW_KEY_ESCAPE);
-	if (escape && !escLast)
-	{
-		*paused = !*paused;
-		if (*paused) // release cursor
-		{
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
-		}
-		else // trap cursor, reset time
-		{
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-			glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
-		}
-	}
-	escLast = escape;
-
-	static bool lastOnGround = false;
 	float ground = noiseMod(noise(camera->trans.pos.x * 100.f, camera->trans.pos.z * 100.f));
 	bool onGround = (camera->trans.pos.y == ground);
 
-	if (!*paused)
+	if (!paused)
 	{
 		float forward = 0.f;
 		float side = 0.f;
@@ -113,8 +103,10 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed,
 			side += moveSpeed;
 		if (glfwGetKey(window, GLFW_KEY_SPACE))
 		{
-			if (onGround || lastOnGround || glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
+			if (!camera->inWater && (onGround || camera->onGround) || glfwGetKey(window, GLFW_KEY_LEFT_CONTROL))
 				up += jumpHeight;
+			else if (camera->inWater)
+				up += jumpHeight * 0.25f;
 		}
 
 		float moveDist = fastSqrt(forward * forward + side * side);
@@ -147,7 +139,7 @@ void playerInput(GLFWwindow* window, Object* camera, float moveSpeed,
 		camera->trans.rot.z = gls_wrapDeg(camera->trans.rot.z);
 	}
 
-	lastOnGround = onGround;
+	camera->onGround = onGround;
 }
 
 void setTitle(GLFWwindow* window, char* fmt, ...)
@@ -180,7 +172,7 @@ RGB colorFromHeight(float height)
 
 	const float deepHeight = 0.45f;
 	const float waterHeight = 0.499f;
-	const float sandHeight = 0.5f;
+	const float sandHeight = 0.50f;
 	const float grassHeight = 0.501;
 	const float coldHeight = 0.52f;
 	const float stoneHeight = 0.58f;
@@ -228,7 +220,7 @@ Model generateWorld(float x, float z, int lod)
 {
 	Model model = { 0 };
 
-	lod = min(lod, 8);
+	lod = max(min(lod, 8), 1);
 
 	float step = 5.f * powf(1.75f, lod);
 	float size = 1000.f;
@@ -326,9 +318,6 @@ int main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ZERO);
 
-	//glEnable(GL_POLYGON_OFFSET_LINE);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
 	double timeNow = glfwGetTime();
 	double timeLast = glfwGetTime();
 	double deltaTime = 0.0;
@@ -361,18 +350,50 @@ int main()
 	float fov = 120.f;
 
 	bool paused = false;
+	bool escLast = false;
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
 
+	bool wireframe = false;
+	bool tLast = false;
+
 	while (!glfwWindowShouldClose(window))
 	{
+		bool tPressed = glfwGetKey(window, GLFW_KEY_T);
+		if (tPressed && !tLast)
+		{
+			wireframe = !wireframe;
+			if (wireframe)
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			else
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		}
+		tLast = tPressed;
+
+		bool escape = glfwGetKey(window, GLFW_KEY_ESCAPE);
+		if (escape && !escLast)
+		{
+			paused = !paused;
+			if (paused) // release cursor
+			{
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+				glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
+			}
+			else // trap cursor
+			{
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				glfwSetCursorPos(window, glh_width / 2.f, glh_height / 2.f);
+			}
+		}
+		escLast = escape;
+
 		timeNow = glfwGetTime();
 		deltaTime += timeNow - timeLast;
 		while (deltaTime >= updateTime)
 		{
 			deltaTime -= updateTime;
 
-			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, &paused);
+			playerInput(window, &camera, moveSpeed, sprintSpeed, lookSpeed, jumpHeight, paused);
 			applyPhysics(&camera, gravity);
 
 			if (glfwGetKey(window, GLFW_KEY_DOWN))
@@ -417,7 +438,7 @@ int main()
 
 		glfwSwapBuffers(window);
 
-		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f) | Rot(%.2f, %.2f) | ViewDist: %f", 
+		setTitle(window, "FPS:%4u | #Tri: %llu | Pos(%.2f, %.2f, %.2f) | Rot(%.2f, %.2f) | ViewDist: %.2f", 
 			fps, triCount / 3,
 			camera.trans.pos.x, camera.trans.pos.y, camera.trans.pos.z,
 			camera.trans.rot.x, camera.trans.rot.y,
